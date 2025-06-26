@@ -289,11 +289,11 @@ impl InterruptCommand {
         )
     }
 
-    fn high(self) -> u32 {
+    pub(crate) fn high(self) -> u32 {
         self.high
     }
 
-    fn low(self) -> u32 {
+    pub(crate) fn low(self) -> u32 {
         self.low
     }
 }

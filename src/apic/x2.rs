@@ -79,74 +79,74 @@ struct x2;
 impl Mode for x2 {
     type Inner = ();
 
-    fn get_id() -> u8 {
+    fn get_id(_: Self::Inner) -> u8 {
         let raw = read_register(Register::ID);
         u8::try_from(raw.get_bits(24..)).unwrap()
     }
 
-    fn get_version() -> Version {
+    fn get_version(_: Self::Inner) -> Version {
         let raw = u32::try_from(read_register(Register::VERSION)).unwrap();
         Version(raw)
     }
 
-    fn get_task_priority() -> TaskPriority {
+    fn get_task_priority(_: Self::Inner) -> TaskPriority {
         todo!()
     }
 
-    fn set_task_priority(value: TaskPriority) {
+    fn set_task_priority(_: Self::Inner, value: TaskPriority) {
         todo!()
     }
 
-    fn get_arbitration_priority() -> ArbitrationPriority {
+    fn get_arbitration_priority(_: Self::Inner) -> ArbitrationPriority {
         todo!()
     }
 
-    fn get_processor_priority() -> ProcessorPriority {
+    fn get_processor_priority(_: Self::Inner) -> ProcessorPriority {
         todo!()
     }
 
-    fn get_remote_read() -> RemoteRead {
+    fn get_remote_read(_: Self::Inner) -> RemoteRead {
         todo!()
     }
 
-    fn get_local_destination() -> LocalDestination {
+    fn get_local_destination(_: Self::Inner) -> LocalDestination {
         todo!()
     }
 
-    fn get_error_status() -> ErrorStatus {
+    fn get_error_status(_: Self::Inner) -> ErrorStatus {
         let raw = u32::try_from(read_register(Register::ERROR_STATUS)).unwrap();
         ErrorStatus::from_bits_truncate(raw)
     }
 
-    fn clear_error_status() {
+    fn clear_error_status(_: Self::Inner) {
         write_register(Register::ERROR_STATUS, 0x0);
     }
 
-    fn get_timer_initial_count() -> u32 {
+    fn get_timer_initial_count(_: Self::Inner) -> u32 {
         u32::try_from(read_register(Register::TIMER_INITIAL_COUNT)).unwrap()
     }
 
-    fn set_timer_initial_count(value: u32) {
+    fn set_timer_initial_count(_: Self::Inner, value: u32) {
         write_register(Register::TIMER_INITIAL_COUNT, u64::from(value));
     }
 
-    fn get_timer_current_count() -> u32 {
+    fn get_timer_current_count(_: Self::Inner) -> u32 {
         u32::try_from(read_register(Register::TIMER_CURRENT_COUNT)).unwrap()
     }
 
-    fn get_timer_divide_configuration() -> TimerDivideConfiguration {
+    fn get_timer_divide_configuration(_: Self::Inner) -> TimerDivideConfiguration {
         let raw = u32::try_from(read_register(Register::TIMER_DIVIDE_CONFIGURATION)).unwrap();
         TimerDivideConfiguration::from_bits_truncate(raw)
     }
 
-    fn set_timer_divide_configuration(value: TimerDivideConfiguration) {
+    fn set_timer_divide_configuration(_: Self::Inner, value: TimerDivideConfiguration) {
         write_register(
             Register::TIMER_DIVIDE_CONFIGURATION,
             u64::from(value.bits()),
         );
     }
 
-    fn send_interrupt_command(interrupt_command: crate::InterruptCommand) {
+    fn send_interrupt_command(_: Self::Inner, interrupt_command: crate::InterruptCommand) {
         let high = u64::from(interrupt_command.high());
         let low = u64::from(interrupt_command.low());
 
@@ -158,21 +158,21 @@ impl Mode for x2 {
         write_register(Register::INTERRUPT_COMMAND, (high << 32) | low);
     }
 
-    fn get_spurious_vector() -> SpuriousInterruptVector {
+    fn get_spurious_vector(_: Self::Inner) -> SpuriousInterruptVector {
         todo!()
     }
 
-    fn set_spurious_vector(value: SpuriousInterruptVector) {
+    fn set_spurious_vector(_: Self::Inner, value: SpuriousInterruptVector) {
         todo!()
     }
 
-    fn get_timer_vector() -> LocalVector<Timer> {
+    fn get_timer_vector(_: Self::Inner) -> LocalVector<Timer> {
         let raw = u32::try_from(read_register(Register::TIMER_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<Timer>::new(raw) }
     }
 
-    fn set_timer_vector(value: LocalVector<Timer>) {
+    fn set_timer_vector(_: Self::Inner, value: LocalVector<Timer>) {
         // IA32 SDM instructs utilizing the `mfence` instruction to ensure all writes to the IA32_TSC_DEADLINE
         // MSR are serialized *after* the APIC timer mode switch (`wrmsr` to `IA32_TSC_DEADLINE` is non-serializing).
         if value.get_mode() == TimerMode::TscDeadline {
@@ -185,67 +185,67 @@ impl Mode for x2 {
         write_register(Register::TIMER_VECTOR, u64::from(value));
     }
 
-    fn get_cmci_vector() -> LocalVector<CMCI> {
+    fn get_cmci_vector(_: Self::Inner) -> LocalVector<CMCI> {
         let raw = u32::try_from(read_register(Register::CMCI_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<CMCI>::new(raw) }
     }
 
-    fn set_cmci_vector(value: LocalVector<CMCI>) {
+    fn set_cmci_vector(_: Self::Inner, value: LocalVector<CMCI>) {
         write_register(Register::CMCI_VECTOR, u64::from(value));
     }
 
-    fn get_lint0_vector() -> LocalVector<LINT0> {
+    fn get_lint0_vector(_: Self::Inner) -> LocalVector<LINT0> {
         let raw = u32::try_from(read_register(Register::LINT0_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<LINT0>::new(raw) }
     }
 
-    fn set_lint0_vector(value: LocalVector<LINT0>) {
+    fn set_lint0_vector(_: Self::Inner, value: LocalVector<LINT0>) {
         write_register(Register::LINT0_VECTOR, u64::from(value));
     }
 
-    fn get_lint1_vector() -> LocalVector<LINT1> {
+    fn get_lint1_vector(_: Self::Inner) -> LocalVector<LINT1> {
         let raw = u32::try_from(read_register(Register::LINT1_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<LINT1>::new(raw) }
     }
 
-    fn set_lint1_vector(value: LocalVector<LINT1>) {
+    fn set_lint1_vector(_: Self::Inner, value: LocalVector<LINT1>) {
         write_register(Register::LINT1_VECTOR, u64::from(value));
     }
 
-    fn get_error_vector() -> LocalVector<Error> {
+    fn get_error_vector(_: Self::Inner) -> LocalVector<Error> {
         let raw = u32::try_from(read_register(Register::ERROR_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<Error>::new(raw) }
     }
 
-    fn set_error_vector(value: LocalVector<Error>) {
+    fn set_error_vector(_: Self::Inner, value: LocalVector<Error>) {
         write_register(Register::ERROR_VECTOR, u64::from(value));
     }
 
-    fn get_performance_monitors_vector() -> LocalVector<PerformanceMonitors> {
+    fn get_performance_monitors_vector(_: Self::Inner) -> LocalVector<PerformanceMonitors> {
         let raw = u32::try_from(read_register(Register::PERFORMANCE_MONITORS_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<PerformanceMonitors>::new(raw) }
     }
 
-    fn set_performance_monitors_vector(value: LocalVector<PerformanceMonitors>) {
+    fn set_performance_monitors_vector(_: Self::Inner, value: LocalVector<PerformanceMonitors>) {
         write_register(Register::PERFORMANCE_MONITORS_VECTOR, u64::from(value));
     }
 
-    fn get_thermal_sensor_vector() -> LocalVector<ThermalSensor> {
+    fn get_thermal_sensor_vector(_: Self::Inner) -> LocalVector<ThermalSensor> {
         let raw = u32::try_from(read_register(Register::THERMAL_SENSOR_VECTOR)).unwrap();
         // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
         unsafe { LocalVector::<ThermalSensor>::new(raw) }
     }
 
-    fn set_thermal_sensor_vector(value: LocalVector<ThermalSensor>) {
+    fn set_thermal_sensor_vector(_: Self::Inner, value: LocalVector<ThermalSensor>) {
         write_register(Register::THERMAL_SENSOR_VECTOR, u64::from(value));
     }
 
-    fn end_of_interrrupt() {
+    fn end_of_interrrupt(_: Self::Inner) {
         write_register(Register::END_OF_INTERRUPT, 0x0);
     }
 }

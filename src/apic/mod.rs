@@ -1,5 +1,6 @@
 use bit_field::BitField;
-use core::arch::asm;
+use core::{arch::asm, fmt};
+use local_vector::*;
 
 pub mod local_vector;
 pub mod x1;
@@ -7,7 +8,6 @@ pub mod x2;
 
 mod interrupt_command;
 pub use interrupt_command::*;
-
 
 /// Gets the value of the `IA32_APIC_BASE` model-specific register.
 fn get_ia32_apic_base() -> u64 {
@@ -45,8 +45,7 @@ unsafe fn set_ia32_apic_base(value: u64) {
 
 /// Specifies the version of an APIC device, the number of local vector
 /// table entries, and whether software can suppress end-of-interrupt broadcasts.
-#[repr(transparent)]
-struct Version(u32);
+pub struct Version(u32);
 
 impl Version {
     /// Version of the APIC device.
@@ -73,6 +72,19 @@ impl Version {
     /// - For the Pentium processor (which has 4 LVT entries): 3
     pub fn max_lvt_entry(&self) -> u8 {
         u8::try_from(self.0.get_bits(16..24)).unwrap()
+    }
+}
+
+impl fmt::Debug for Version {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Version")
+            .field("Version", &self.version())
+            .field(
+                "Can Suppress EOI Broadcast",
+                &self.can_suppress_eoi_broadcast(),
+            )
+            .field("Maximum LVT Entry", &self.max_lvt_entry())
+            .finish()
     }
 }
 
@@ -109,59 +121,59 @@ bitflags! {
 pub const xAPIC_BASE_ADDR: usize = 0xFEE00000;
 pub const x2APIC_BASE_MSR_ADDR: u32 = 0x800;
 
-trait Mode {
+pub trait Mode {
     type Inner;
 
-    fn get_id() -> u8;
-    fn get_version() -> Version;
+    fn get_id(inner: Self::Inner) -> u8;
+    fn get_version(inner: Self::Inner) -> Version;
 
-    fn get_task_priority() -> TaskPriority;
-    fn set_task_priority(value: TaskPriority);
+    fn get_task_priority(inner: Self::Inner) -> TaskPriority;
+    fn set_task_priority(inner: Self::Inner, value: TaskPriority);
 
-    fn get_arbitration_priority() -> ArbitrationPriority;
-    fn get_processor_priority() -> ProcessorPriority;
+    fn get_arbitration_priority(inner: Self::Inner) -> ArbitrationPriority;
+    fn get_processor_priority(inner: Self::Inner) -> ProcessorPriority;
 
-    fn get_remote_read() -> RemoteRead;
-    fn get_local_destination() -> LocalDestination;
+    fn get_remote_read(inner: Self::Inner) -> RemoteRead;
+    fn get_local_destination(inner: Self::Inner) -> LocalDestination;
 
-    fn get_error_status() -> ErrorStatus;
-    fn clear_error_status();
+    fn get_error_status(inner: Self::Inner) -> ErrorStatus;
+    fn clear_error_status(inner: Self::Inner);
 
-    fn get_timer_initial_count() -> u32;
-    fn set_timer_initial_count(value: u32);
+    fn get_timer_initial_count(inner: Self::Inner) -> u32;
+    fn set_timer_initial_count(inner: Self::Inner, value: u32);
 
-    fn get_timer_current_count() -> u32;
+    fn get_timer_current_count(inner: Self::Inner) -> u32;
 
-    fn get_timer_divide_configuration() -> TimerDivideConfiguration;
-    fn set_timer_divide_configuration(value: TimerDivideConfiguration);
+    fn get_timer_divide_configuration(inner: Self::Inner) -> TimerDivideConfiguration;
+    fn set_timer_divide_configuration(inner: Self::Inner, value: TimerDivideConfiguration);
 
-    fn send_interrupt_command(interrupt_command: InterruptCommand);
+    fn send_interrupt_command(inner: Self::Inner, interrupt_command: InterruptCommand);
 
-    fn get_spurious_vector() -> SpuriousInterruptVector;
-    fn set_spurious_vector(value: SpuriousInterruptVector);
+    fn get_spurious_vector(inner: Self::Inner) -> SpuriousInterruptVector;
+    fn set_spurious_vector(inner: Self::Inner, value: SpuriousInterruptVector);
 
-    fn get_timer_vector() -> LocalVector<Timer>;
-    fn set_timer_vector(value: LocalVector<Timer>);
+    fn get_timer_vector(inner: Self::Inner) -> LocalVector<Timer>;
+    fn set_timer_vector(inner: Self::Inner, value: LocalVector<Timer>);
 
-    fn get_cmci_vector() -> LocalVector<CMCI>;
-    fn set_cmci_vector(value: LocalVector<CMCI>);
+    fn get_cmci_vector(inner: Self::Inner) -> LocalVector<CMCI>;
+    fn set_cmci_vector(inner: Self::Inner, value: LocalVector<CMCI>);
 
-    fn get_lint0_vector() -> LocalVector<LINT0>;
-    fn set_lint0_vector(value: LocalVector<LINT0>);
+    fn get_lint0_vector(inner: Self::Inner) -> LocalVector<LINT0>;
+    fn set_lint0_vector(inner: Self::Inner, value: LocalVector<LINT0>);
 
-    fn get_lint1_vector() -> LocalVector<LINT1>;
-    fn set_lint1_vector(value: LocalVector<LINT1>);
+    fn get_lint1_vector(inner: Self::Inner) -> LocalVector<LINT1>;
+    fn set_lint1_vector(inner: Self::Inner, value: LocalVector<LINT1>);
 
-    fn get_error_vector() -> LocalVector<Error>;
-    fn set_error_vector(value: LocalVector<Error>);
+    fn get_error_vector(inner: Self::Inner) -> LocalVector<Error>;
+    fn set_error_vector(inner: Self::Inner, value: LocalVector<Error>);
 
-    fn get_performance_monitors_vector() -> LocalVector<PerformanceMonitors>;
-    fn set_performance_monitors_vector(value: LocalVector<PerformanceMonitors>);
+    fn get_performance_monitors_vector(inner: Self::Inner) -> LocalVector<PerformanceMonitors>;
+    fn set_performance_monitors_vector(inner: Self::Inner, value: LocalVector<PerformanceMonitors>);
 
-    fn get_thermal_sensor_vector() -> LocalVector<ThermalSensor>;
-    fn set_thermal_sensor_vector(value: LocalVector<ThermalSensor>);
+    fn get_thermal_sensor_vector(inner: Self::Inner) -> LocalVector<ThermalSensor>;
+    fn set_thermal_sensor_vector(inner: Self::Inner, value: LocalVector<ThermalSensor>);
 
-    fn end_of_interrrupt();
+    fn end_of_interrrupt(inner: Self::Inner);
 }
 
 pub struct xApic<M: Mode>(M::Inner);
