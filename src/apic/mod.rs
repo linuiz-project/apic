@@ -1,5 +1,5 @@
 use bit_field::BitField;
-use core::{arch::asm, fmt};
+use core::{arch::asm, fmt, marker::PhantomData};
 use local_vector::*;
 
 pub mod local_vector;
@@ -45,7 +45,7 @@ unsafe fn set_ia32_apic_base(value: u64) {
 
 /// Specifies the version of an APIC device, the number of local vector
 /// table entries, and whether software can suppress end-of-interrupt broadcasts.
-pub struct Version(u32);
+pub struct Version(pub(crate) u32);
 
 impl Version {
     /// Version of the APIC device.
@@ -103,6 +103,67 @@ bitflags! {
     }
 }
 
+/// A special situation may occur when a processor raises its task priority to be greater
+/// than or equal to the level of the interrupt for which the processor INTR signal is
+/// currently being asserted. If at the time the INTA cycle is issued, the interrupt that
+/// was to be dispensed has become masked (programmed by software), the local APIC will
+/// deliver a spurious-interrupt vector. Dispensing the spurious-interrupt vector does not
+/// affect the interrupt service register, so the handler for this vector should return
+/// without an end-of-interrupt call.
+pub struct SpuriousInterrupt<'a, M: Mode>(M::Inner, PhantomData<&'a ()>);
+
+impl<M: Mode> SpuriousInterrupt<'_, M> {
+    /// Determines the vector number to be delivered to the processor when the local
+    /// APIC generates a spurious vector.
+    ///
+    /// - **For Pentium 4 and Intel Xeon processors**: Bits 0..=7 of the this field are
+    ///   programmable by software.
+    /// - **For P6 family and Pentium processors**: Bits 4..=7 of the this field are
+    ///   programmable by software, and bits 0..=3 are hardwired to logical ones.
+    pub fn get_vector(&self) -> u8 {
+        M::get_spurious_vector(self.0.clone())
+    }
+
+    /// Sets the vector number to be delivered to the processor when the local APIC
+    /// generates a spurious vector.
+    ///
+    /// - **For Pentium 4 and Intel Xeon processors**: Bits 0..=7 of the this field are
+    ///   programmable by software.
+    /// - **For P6 family and Pentium processors**: Bits 4..=7 of the this field are
+    ///   programmable by software, and bits 0..=3 are hardwired to logical ones.
+    pub fn set_vector(&mut self, vector: u8) {
+        M::set_spurious_vector(self.0.clone(), vector);
+    }
+
+    /// Whether the local APIC is enabled (`1`/`true`) or disabled (`0`/`false`).
+    pub fn get_apic_enabled(&self) -> bool {
+        M::get_spurious_apic_software_enabled(self.0.clone())
+    }
+
+    /// Enables (`1`/`true`) or disables (`0`/`false`) the local APIC.
+    pub fn set_apic_enabled(&mut self, value: bool) {
+        M::set_spurious_apic_software_enabled(self.0.clone(), value);
+    }
+
+    /// Determines whether an end-of-interrupt for a level-triggered interrupt causes
+    /// end-of-interrupt messages to be broadcast to the I/O APICs (`0`/`false`) or not
+    /// (`1`/`true`). The default value for this bit is `0`/`false`, indicating that
+    /// end-of-interrupt broadcasts are performed. This bit is reserved to `0`/`false`
+    /// if the processor does not support end-of-interrupt broadcast suppression.
+    pub fn get_eoi_broadcast_suppression(&self) -> bool {
+        M::get_spurious_eoi_broadcast_suppression(self.0.clone())
+    }
+
+    /// Sets whether an end-of-interrupt for a level-triggered interrupt causes
+    /// end-of-interrupt messages to be broadcast to the I/O APICs (`0`/`false`) or not
+    /// (`1`/`true`). The default value for this bit is `0`/`false`, indicating that
+    /// end-of-interrupt broadcasts are performed. This bit is reserved to `0`/`false`
+    /// if the processor does not support end-of-interrupt broadcast suppression.
+    pub fn set_eoi_broadcast_suppression(&mut self, value: bool) {
+        M::set_spurious_eoi_broadcast_suppression(self.0.clone(), value);
+    }
+}
+
 bitflags! {
     #[repr(transparent)]
     #[derive(Debug, Clone, Copy)]
@@ -122,9 +183,20 @@ pub const xAPIC_BASE_ADDR: usize = 0xFEE00000;
 pub const x2APIC_BASE_MSR_ADDR: u32 = 0x800;
 
 pub trait Mode {
-    type Inner;
+    type Inner: Clone;
+    type Register: Copy;
 
-    fn get_id(inner: Self::Inner) -> u8;
+    const ID: Self::Register;
+    const VERSION: Self::Register;
+    const ERROR_STATUS: Self::Register;
+    const SPURIOUS_INTERRUPT: Self::Register;
+    const INTERRUPT_COMMAND_LOW: Self::Register;
+    const INTERRUPT_COMMAND_HIGH: Self::Register;
+
+    fn read_register_raw(inner: Self::Inner, register: Self::Register) -> u32;
+    fn write_register_raw(inner: Self::Inner, register: Self::Register, value: u32);
+
+    fn get_id(inner: Self::Inner) -> u32;
     fn get_version(inner: Self::Inner) -> Version;
 
     fn get_task_priority(inner: Self::Inner) -> TaskPriority;
@@ -149,8 +221,14 @@ pub trait Mode {
 
     fn send_interrupt_command(inner: Self::Inner, interrupt_command: InterruptCommand);
 
-    fn get_spurious_vector(inner: Self::Inner) -> SpuriousInterruptVector;
-    fn set_spurious_vector(inner: Self::Inner, value: SpuriousInterruptVector);
+    fn get_spurious_vector(inner: Self::Inner) -> u8;
+    fn get_spurious_apic_software_enabled(inner: Self::Inner) -> bool;
+    fn get_spurious_focus_processor_checking(inner: Self::Inner) -> bool;
+    fn get_spurious_eoi_broadcast_suppression(inner: Self::Inner) -> bool;
+    fn set_spurious_vector(inner: Self::Inner, vector: u8);
+    fn set_spurious_apic_software_enabled(inner: Self::Inner, value: bool);
+    fn set_spurious_focus_processor_checking(inner: Self::Inner, value: bool);
+    fn set_spurious_eoi_broadcast_suppression(inner: Self::Inner, value: bool);
 
     fn get_timer_vector(inner: Self::Inner) -> LocalVector<Timer>;
     fn set_timer_vector(inner: Self::Inner, value: LocalVector<Timer>);
@@ -177,6 +255,24 @@ pub trait Mode {
 }
 
 pub struct xApic<M: Mode>(M::Inner);
+
+impl<M: Mode> xApic<M> {
+    pub fn get_id(&self) -> u32 {
+        M::get_id(self.0.clone())
+    }
+
+    pub fn get_version(&self) -> Version {
+        M::get_version(self.0.clone())
+    }
+
+    pub fn get_error_status(&self) -> ErrorStatus {
+        M::get_error_status(self.0.clone())
+    }
+
+    pub fn get_spurious_vector(&self) -> SpuriousInterrupt<M> {
+        SpuriousInterrupt(self.0.clone(), PhantomData)
+    }
+}
 
 // impl Apic {
 //     pub fn new(map_xapic_fn: Option<impl FnOnce(usize) -> *mut u8>) -> Option<Self> {

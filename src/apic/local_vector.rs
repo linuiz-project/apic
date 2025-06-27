@@ -1,4 +1,4 @@
-use crate::InterruptDeliveryMode;
+use crate::{InterruptDeliveryMode, Mode};
 use bit_field::BitField;
 use core::marker::PhantomData;
 
@@ -30,17 +30,8 @@ impl Kind for ThermalSensor {}
 impl Deliverable for ThermalSensor {}
 
 #[derive(Debug, Clone)]
-pub struct LocalVector<K: Kind>(u32, PhantomData<K>);
-
-impl<K: Kind> LocalVector<K> {
-    /// # Safety
-    ///
-    /// - `raw` must be a valid `u32` read directly from the respective
-    ///   entry in the APIC's local vector table.
-    pub(crate) unsafe fn new(raw: u32) -> Self {
-        Self(raw, PhantomData)
-    }
-
+pub struct LocalVector<'a, M: Mode, K: Kind>(pub(crate) M::Inner, pub(crate) PhantomData<&'a K>);
+impl<M: Mode, K: Kind> LocalVector<'_, M, K> {
     /// Gets the delivery status of the interrupt.
     ///
     /// - `true` indicates that an interrupt from this source has been delivered to the

@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use crate::{
     ErrorStatus, Mode, TimerDivideConfiguration, Version,
     local_vector::{
@@ -79,9 +81,8 @@ struct x2;
 impl Mode for x2 {
     type Inner = ();
 
-    fn get_id(_: Self::Inner) -> u8 {
-        let raw = read_register(Register::ID);
-        u8::try_from(raw.get_bits(24..)).unwrap()
+    fn get_id(_: Self::Inner) -> u32 {
+        u32::try_from(read_register(Register::ID)).unwrap()
     }
 
     fn get_version(_: Self::Inner) -> Version {
@@ -158,18 +159,53 @@ impl Mode for x2 {
         write_register(Register::INTERRUPT_COMMAND, (high << 32) | low);
     }
 
-    fn get_spurious_vector(_: Self::Inner) -> SpuriousInterruptVector {
-        todo!()
+    fn get_spurious_vector(_: Self::Inner) -> u8 {
+        u8::try_from(read_register(Register::SPURIOUS_VECTOR).get_bits(..8)).unwrap()
     }
 
-    fn set_spurious_vector(_: Self::Inner, value: SpuriousInterruptVector) {
-        todo!()
+    fn get_spurious_apic_software_enabled(_: Self::Inner) -> bool {
+        read_register(Register::SPURIOUS_VECTOR).get_bit(8)
+    }
+
+    fn get_spurious_focus_processor_checking(_: Self::Inner) -> bool {
+        read_register(Register::SPURIOUS_VECTOR).get_bit(9)
+    }
+
+    fn get_spurious_eoi_broadcast_suppression(_: Self::Inner) -> bool {
+        read_register(Register::SPURIOUS_VECTOR).get_bit(12)
+    }
+
+    fn set_spurious_vector(_: Self::Inner, vector: u8) {
+        write_register(
+            Register::SPURIOUS_VECTOR,
+            *read_register(Register::SPURIOUS_VECTOR).set_bits(..8, u64::from(vector)),
+        );
+    }
+
+    fn set_spurious_apic_software_enabled(_: Self::Inner, value: bool) {
+        write_register(
+            Register::SPURIOUS_VECTOR,
+            *read_register(Register::SPURIOUS_VECTOR).set_bit(8, value),
+        );
+    }
+
+    fn set_spurious_focus_processor_checking(_: Self::Inner, value: bool) {
+        write_register(
+            Register::SPURIOUS_VECTOR,
+            *read_register(Register::SPURIOUS_VECTOR).set_bit(9, value),
+        );
+    }
+
+    fn set_spurious_eoi_broadcast_suppression(_: Self::Inner, value: bool) {
+        write_register(
+            Register::SPURIOUS_VECTOR,
+            *read_register(Register::SPURIOUS_VECTOR).set_bit(12, value),
+        );
     }
 
     fn get_timer_vector(_: Self::Inner) -> LocalVector<Timer> {
         let raw = u32::try_from(read_register(Register::TIMER_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<Timer>::new(raw) }
+        LocalVector::<Timer>(raw, PhantomData)
     }
 
     fn set_timer_vector(_: Self::Inner, value: LocalVector<Timer>) {
@@ -187,8 +223,7 @@ impl Mode for x2 {
 
     fn get_cmci_vector(_: Self::Inner) -> LocalVector<CMCI> {
         let raw = u32::try_from(read_register(Register::CMCI_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<CMCI>::new(raw) }
+        LocalVector::<CMCI>(raw, PhantomData)
     }
 
     fn set_cmci_vector(_: Self::Inner, value: LocalVector<CMCI>) {
@@ -197,8 +232,7 @@ impl Mode for x2 {
 
     fn get_lint0_vector(_: Self::Inner) -> LocalVector<LINT0> {
         let raw = u32::try_from(read_register(Register::LINT0_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<LINT0>::new(raw) }
+        LocalVector::<LINT0>(raw, PhantomData)
     }
 
     fn set_lint0_vector(_: Self::Inner, value: LocalVector<LINT0>) {
@@ -207,8 +241,7 @@ impl Mode for x2 {
 
     fn get_lint1_vector(_: Self::Inner) -> LocalVector<LINT1> {
         let raw = u32::try_from(read_register(Register::LINT1_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<LINT1>::new(raw) }
+        LocalVector::<LINT1>(raw, PhantomData)
     }
 
     fn set_lint1_vector(_: Self::Inner, value: LocalVector<LINT1>) {
@@ -217,8 +250,7 @@ impl Mode for x2 {
 
     fn get_error_vector(_: Self::Inner) -> LocalVector<Error> {
         let raw = u32::try_from(read_register(Register::ERROR_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<Error>::new(raw) }
+        LocalVector::<Error>(raw, PhantomData)
     }
 
     fn set_error_vector(_: Self::Inner, value: LocalVector<Error>) {
@@ -227,8 +259,7 @@ impl Mode for x2 {
 
     fn get_performance_monitors_vector(_: Self::Inner) -> LocalVector<PerformanceMonitors> {
         let raw = u32::try_from(read_register(Register::PERFORMANCE_MONITORS_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<PerformanceMonitors>::new(raw) }
+        LocalVector::<PerformanceMonitors>(raw, PhantomData)
     }
 
     fn set_performance_monitors_vector(_: Self::Inner, value: LocalVector<PerformanceMonitors>) {
@@ -237,8 +268,7 @@ impl Mode for x2 {
 
     fn get_thermal_sensor_vector(_: Self::Inner) -> LocalVector<ThermalSensor> {
         let raw = u32::try_from(read_register(Register::THERMAL_SENSOR_VECTOR)).unwrap();
-        // Safety: `raw` is a valid `u32` read directly from the respective entry in the local vector table.
-        unsafe { LocalVector::<ThermalSensor>::new(raw) }
+        LocalVector::<ThermalSensor>(raw, PhantomData)
     }
 
     fn set_thermal_sensor_vector(_: Self::Inner, value: LocalVector<ThermalSensor>) {
